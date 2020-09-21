@@ -1,5 +1,6 @@
-import javax.crypto.KeyAgreement;
+import javax.crypto.*;
 import javax.swing.*;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -32,13 +33,30 @@ public class Networking {
             JOptionPane.showMessageDialog(null, ServerResponse);
             //If the user's login credentials are valid then begin the diffie hellman section
             if (ServerResponse.equalsIgnoreCase("Success!")) {
+                //Generate the session key
                 byte[] SessionKey = Cryptography.DiffieHellman(Input, Output);
-                System.out.println(Base64.getEncoder().encodeToString(SessionKey));
+                //Hash the session key
+                byte[] SmallSessionKey = Cryptography.SHA1Hash(SessionKey);
+                //Gets the IV, IV length, and cipher text
+                int IVLength = (int) Input.readObject();
+                byte[] IV = (byte[]) Input.readObject();
+                byte[] CipherText = (byte[]) Input.readObject();
+                System.out.println(Base64.getEncoder().encodeToString(CipherText));
+                FileOutputStream fileOutputStream = new FileOutputStream("ServerFile.des");
+                fileOutputStream.write(CipherText);
+                fileOutputStream.close();
+                Cryptography.DESDecrypt(SmallSessionKey, IV, CipherText);
             }
             Input.close();
             Output.close();
             Client.close();
         } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | NoSuchAlgorithmException | InvalidKeySpecException | InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
             e.printStackTrace();
         }
     }

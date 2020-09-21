@@ -1,10 +1,11 @@
-import javax.crypto.KeyAgreement;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import javax.crypto.*;
+import javax.crypto.spec.DESKeySpec;
+import javax.crypto.spec.IvParameterSpec;
+import java.io.*;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
 
 public class Cryptography {
@@ -22,6 +23,23 @@ public class Cryptography {
         KeyPairGenerator ServerKPG = KeyPairGenerator.getInstance("DH");
         ServerKPG.initialize(SKIP.sDHParameterSpec);
         return ServerKPG.genKeyPair();
+    }
+    /*
+    Name: DiffieHellman
+    Purpose: Hash a byte array using the sha-1 algorithm
+    Author: Doctor Burris and Samuel McManus
+    Parameter DHBytes: The session key received from the diffie-hellman algorithm
+    Return: A hash of the session key
+    Uses: N/A
+    Used By: Listen
+    Date: September 18, 2020
+     */
+    public static byte[] SHA1Hash(byte[] DHBytes) throws NoSuchAlgorithmException {
+        //Creates an instance of the sha-1 message digest
+        MessageDigest Sha = MessageDigest.getInstance("SHA");
+        //Feeds the input to the Sha algorithm and returns the digest
+        Sha.update(DHBytes);
+        return Sha.digest();
     }
     /*
     Name: DiffieHellman
@@ -58,5 +76,56 @@ public class Cryptography {
         SecretKeyAgreement.init(DHKeys.getPrivate());
         SecretKeyAgreement.doPhase(ServerPublicKey, true);
         return SecretKeyAgreement.generateSecret();
+    }
+    /*
+    Name: DESKeyGen
+    Purpose: Generate a DES key using the session key as the password
+    Author: Doctor Burris
+    Parameter Parameter: A hash of the session key received from the diffie-hellman algorithm
+    Return: The secret DES key
+    Uses: N/A
+    Used By: DESEncrypt
+    Date: September 18, 2020
+     */
+    public static SecretKey DESKeyGen(byte[] Password) throws InvalidKeyException,
+            NoSuchAlgorithmException, InvalidKeySpecException {
+        //Create a key specification from the password
+        DESKeySpec desKeySpec = new DESKeySpec(Password);
+        //Get an instance of the DES algorithm and return the secret key made from it
+        SecretKeyFactory KeyFactory = SecretKeyFactory.getInstance("DES");
+        return KeyFactory.generateSecret(desKeySpec);
+    }
+    public static void DESDecrypt(byte[] SessionBytes, byte[] IV, byte[] CipherText) throws
+            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException,
+            IOException, BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+        //Initializes a file input stream
+        FileInputStream fin = new FileInputStream("ServerFile.des");
+        StringBuilder Plaintext = new StringBuilder();
+        //Gets a DES secret key
+        SecretKey DESKey = DESKeyGen(SessionBytes);
+        IvParameterSpec ivps = new IvParameterSpec(IV);
+        //Gets an instance of the cipher class using the DES algorithm  in encrypt mode
+        Cipher des = Cipher.getInstance("DES/CBC/PKCS5Padding");
+        des.init(Cipher.DECRYPT_MODE, DESKey, ivps);
+        /*
+        //Writes in 128 byte blocks
+        byte[] Input = new byte[128];
+        //Infinitely loops reading 128 bytes from the file, encrypting those bytes,
+        //and writing them to the output stream
+        while(true){
+            int BytesRead = fin.read(Input);
+            if(BytesRead == -1)
+                break;
+            byte[] OutputBytes = des.update(Input, 0, BytesRead);
+            if(OutputBytes != null)
+                Plaintext.append(Arrays.toString(des.update(OutputBytes)));
+        }
+         */
+        //Write the final bytes to the output stream and close the file.
+        byte[] OutputBytes = des.doFinal(CipherText);
+        if(OutputBytes != null)
+            Plaintext.append(Arrays.toString(des.update(OutputBytes)));
+        fin.close();
+        System.out.println(Plaintext.toString());
     }
 }
